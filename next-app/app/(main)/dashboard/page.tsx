@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { TodayTaskCard } from "@/components/today-task-card";
 import { SubjectProgress } from "@/components/subject-progress";
 import { WeeklyChart } from "@/components/weekly-chart";
+import { Clock } from "lucide-react";
 
 interface Task {
   id: string;
@@ -30,7 +32,12 @@ interface WeekDay {
   percent: number;
 }
 
+type PlanStatus = "draft" | "pending" | "assigned" | null;
+
 export default function DashboardPage() {
+  const router = useRouter();
+  const [planStatus, setPlanStatus] = useState<PlanStatus>(null);
+  const [adminNote, setAdminNote] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [progress, setProgress] = useState<ProgressData>({
     total: 0,
@@ -42,6 +49,28 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
+    // 먼저 플랜 상태 확인
+    const plan = await fetch("/api/plans").then((r) => r.json());
+
+    if (!plan?.id) {
+      router.push("/onboarding/subjects");
+      return;
+    }
+
+    setPlanStatus(plan.status);
+    setAdminNote(plan.admin_note);
+
+    if (plan.status === "draft") {
+      router.push("/onboarding/subjects");
+      return;
+    }
+
+    if (plan.status === "pending") {
+      setLoading(false);
+      return;
+    }
+
+    // assigned → 대시보드 데이터 로드
     const [tasksRes, progressRes, weeklyRes] = await Promise.all([
       fetch("/api/tasks/today").then((r) => r.json()),
       fetch("/api/stats/progress").then((r) => r.json()),
@@ -51,7 +80,7 @@ export default function DashboardPage() {
     setProgress(progressRes);
     setWeekly(weeklyRes);
     setLoading(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetchData();
@@ -70,12 +99,47 @@ export default function DashboardPage() {
     );
   }
 
+  // 대기 상태
+  if (planStatus === "pending") {
+    return (
+      <div className="mx-auto max-w-md p-4">
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <div className="bg-muted flex size-16 items-center justify-center rounded-full">
+              <Clock className="text-muted-foreground size-8" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">학습 계획 준비 중</h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                제출이 완료되었습니다.<br />
+                관리자가 맞춤 학습 계획을 작성하고 있어요.<br />
+                잠시만 기다려주세요!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // 계획 전달됨 → 대시보드
   const todayTasks = tasks.filter((t) => !t.carry_over);
   const carryOverTasks = tasks.filter((t) => t.carry_over);
   const todayCompleted = todayTasks.filter((t) => t.completed).length;
 
   return (
     <div className="mx-auto max-w-md space-y-4 p-4">
+      {/* 관리자 메모 */}
+      {adminNote && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="py-3">
+            <p className="text-sm">
+              <span className="font-medium">관리자 메모:</span> {adminNote}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 오늘의 진행 */}
       <Card>
         <CardHeader className="pb-2">
@@ -87,13 +151,10 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {carryOverTasks.length > 0 && (
-            <>
-              {carryOverTasks.map((task) => (
-                <TodayTaskCard key={task.id} task={task} onToggle={handleToggle} />
-              ))}
-            </>
-          )}
+          {carryOverTasks.length > 0 &&
+            carryOverTasks.map((task) => (
+              <TodayTaskCard key={task.id} task={task} onToggle={handleToggle} />
+            ))}
           {todayTasks.length > 0 ? (
             todayTasks.map((task) => (
               <TodayTaskCard key={task.id} task={task} onToggle={handleToggle} />

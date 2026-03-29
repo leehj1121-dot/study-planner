@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { WeightSlider } from "@/components/weight-slider";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 
 interface SubjectWeight {
   id: string;
@@ -82,8 +82,12 @@ export default function TimePage() {
       body: JSON.stringify({ daily_hours: dailyHours }),
     });
 
-    // 스케줄 생성
-    await fetch("/api/plans/generate", { method: "POST" });
+    // 관리자에게 제출 (status → pending)
+    await fetch("/api/plans", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "pending" }),
+    });
 
     router.push("/dashboard");
   };
@@ -159,11 +163,11 @@ export default function TimePage() {
             onClick={handleGenerate}
           >
             {generating ? (
-              "생성 중..."
+              "제출 중..."
             ) : (
               <>
-                <Sparkles className="size-4" />
-                계획 생성
+                <Send className="size-4" />
+                제출하기
               </>
             )}
           </Button>

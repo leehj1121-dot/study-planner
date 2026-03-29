@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     .upsert(
       {
         user_id: user.id,
+        user_email: user.email,
         target_date,
         daily_hours: daily_hours || 1,
         is_onboarded: false,
